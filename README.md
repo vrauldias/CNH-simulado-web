@@ -1,4 +1,4 @@
-# Carteira Quiz — Simulado CNH (versão web)
+# Simulado CNH (versão web)
 
 ## Acesse direto pelo navegador (sem baixar nada)
 

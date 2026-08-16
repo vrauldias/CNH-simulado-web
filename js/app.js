@@ -1,5 +1,5 @@
 /*
- * Carteira Quiz — Simulado CNH (versão web)
+ * Simulado CNH (versão web)
  * Porta em HTML/CSS/JS do app de terminal original, para uso direto no
  * navegador (GitHub Pages ou arquivo local). Progresso e histórico ficam
  * salvos no localStorage do navegador — não há backend.
@@ -10,6 +10,7 @@
   var STORAGE_PROGRESSO = "carteiraQuiz.progresso.v1";
   var STORAGE_SIMULADOS = "carteiraQuiz.simulados.v1";
   var STORAGE_TEMA = "carteiraQuiz.tema.v1";
+  var STORAGE_COMO_USAR_OCULTO = "carteiraQuiz.comoUsarOculto.v1";
 
   var TAMANHO_SIMULADO = 30;
   var NOTA_APROVACAO = Math.ceil(TAMANHO_SIMULADO * 0.7); // 21/30 (70%)
@@ -221,9 +222,57 @@
     return btn;
   }
 
+  function criarBannerComoUsar() {
+    var banner = criarEl("div", "banner-como-usar");
+    banner.appendChild(criarEl("p", "banner-como-usar-titulo", "👋 Como usar"));
+    banner.appendChild(
+      criarEl(
+        "p",
+        null,
+        "▶️ Treino: prática sem fim, priorizando questões que você errou ou ainda não viu. Corrige na hora."
+      )
+    );
+    banner.appendChild(
+      criarEl(
+        "p",
+        null,
+        "📝 Simulado: " +
+          TAMANHO_SIMULADO +
+          " questões — dá pra pular e voltar quando quiser, e só corrige depois que você enviar, como numa prova real."
+      )
+    );
+    banner.appendChild(criarEl("p", null, "Tudo fica salvo automaticamente neste navegador."));
+
+    var acoes = criarEl("div", "banner-como-usar-acoes");
+    var btnOcultar = criarEl("button", "btn btn-secundario", "Não mostrar novamente");
+    btnOcultar.type = "button";
+    btnOcultar.addEventListener("click", function () {
+      try {
+        localStorage.setItem(STORAGE_COMO_USAR_OCULTO, "1");
+      } catch (e) {
+        /* ignora */
+      }
+      renderMenu();
+    });
+    acoes.appendChild(btnOcultar);
+    banner.appendChild(acoes);
+
+    return banner;
+  }
+
   function renderMenu() {
     sessao = null;
     app.innerHTML = "";
+
+    var comoUsarOculto = false;
+    try {
+      comoUsarOculto = localStorage.getItem(STORAGE_COMO_USAR_OCULTO) === "1";
+    } catch (e) {
+      /* ignora */
+    }
+    if (!comoUsarOculto) {
+      app.appendChild(criarBannerComoUsar());
+    }
 
     if (mensagemMenuPendente) {
       app.appendChild(criarEl("div", "aviso-inline", mensagemMenuPendente));
@@ -924,26 +973,25 @@
       ])
     );
 
-    app.appendChild(
-      criarSecaoInfo("Modos disponíveis", [
-        (function () {
-          var ul = document.createElement("ul");
-          ul.className = "info-lista";
-          var itens = [
-            "Treino: sorteio ponderado, priorizando questões erradas ou ainda não vistas, com feedback imediato.",
-            "Simulado: " +
-              TAMANHO_SIMULADO +
-              " questões, navegação livre entre elas (dá pra pular e voltar), aprovação a partir de " +
-              NOTA_APROVACAO +
-              " acertos (70%), com correção e revisão só depois de enviado.",
-          ];
-          itens.forEach(function (texto) {
-            ul.appendChild(criarEl("li", null, texto));
-          });
-          return ul;
-        })(),
-      ])
-    );
+    var comoUsarOculto = false;
+    try {
+      comoUsarOculto = localStorage.getItem(STORAGE_COMO_USAR_OCULTO) === "1";
+    } catch (e) {
+      /* ignora */
+    }
+    if (comoUsarOculto) {
+      var btnMostrar = criarEl("button", "btn btn-secundario", "🔁 Mostrar de novo o aviso “Como usar” no menu");
+      btnMostrar.type = "button";
+      btnMostrar.addEventListener("click", function () {
+        try {
+          localStorage.removeItem(STORAGE_COMO_USAR_OCULTO);
+        } catch (e) {
+          /* ignora */
+        }
+        renderMenu();
+      });
+      app.appendChild(criarSecaoInfo("Preferências", [btnMostrar]));
+    }
   }
 
   function irParaInfo() {
