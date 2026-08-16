@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carteira Quiz — Simulado CNH</title>
+<meta name="description" content="Simulado gratuito para a prova teórica da CNH, com banco de questões e placas oficiais.">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-emoji" aria-hidden="true">🚗</span>
+        <span class="brand-title">Carteira Quiz</span>
+        <span class="brand-sub">— Simulado CNH</span>
+      </div>
+      <button id="btn-tema" class="btn-icon" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
+        <span id="icone-tema" aria-hidden="true">🌙</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="app" class="app"></main>
+
+  <footer class="rodape">
+    <p>
+      Questões: Banco Nacional de Questões (CNH do Brasil). Placas: Mosaico de Placas de Sinalização
+      (CNH do Brasil / SERPRO). Baseado no projeto
+      <a href="https://github.com/AmiltonCabral/brasil-cnh-quiz" target="_blank" rel="noopener noreferrer">brasil-cnh-quiz</a>
+      de Amilton Cabral.
+    </p>
+  </footer>
+
+  <template id="tpl-modal">
+    <div class="modal-backdrop">
+      <div class="modal" role="dialog" aria-modal="true">
+        <p class="modal-msg"></p>
+        <div class="modal-acoes">
+          <button class="btn btn-secundario modal-cancelar" type="button">Cancelar</button>
+          <button class="btn btn-perigo modal-confirmar" type="button">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script src="assets/placas-mapa.js"></script>
+  <script src="assets/questoes.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
