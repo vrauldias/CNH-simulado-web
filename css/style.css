@@ -136,6 +136,8 @@ button { font-family: inherit; }
 .brand-title { font-weight: 700; font-size: 1.1rem; }
 .brand-sub { color: var(--muted); font-size: 0.9rem; }
 
+.topbar-acoes { display: flex; align-items: center; gap: 8px; }
+
 .btn-icon {
   border: 1px solid var(--border);
   background: var(--surface-3);
@@ -157,15 +159,6 @@ button { font-family: inherit; }
   margin: 0 auto;
   padding: 22px 18px 40px;
 }
-
-.rodape {
-  text-align: center;
-  color: var(--muted);
-  font-size: 0.78rem;
-  padding: 18px 18px 28px;
-  line-height: 1.5;
-}
-.rodape a { color: var(--muted); }
 
 /* Menu */
 .menu-grid {
@@ -224,13 +217,70 @@ button { font-family: inherit; }
 }
 .link-voltar:hover { color: var(--text-primary); }
 
-/* Barra de progresso do simulado */
+/* Navegador de questões do simulado (grade estilo Moodle) */
+.navegador-simulado {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow);
+}
+.navegador-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.navegador-titulo { font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.02em; }
+.btn-enviar-simulado { padding: 8px 14px; font-size: 0.85rem; }
+
+.navegador-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 8px;
+}
+.nav-num {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  min-height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: transform 0.08s ease;
+}
+.nav-num:hover { transform: scale(1.06); }
+.nav-num.atual { box-shadow: 0 0 0 2px var(--accent); border-color: var(--accent); }
+.nav-num.nav-pendente { background: var(--surface-1); color: var(--text-secondary); }
+.nav-num.nav-respondida { background: var(--warning); border-color: var(--warning); color: #1a1a19; }
+.nav-num.nav-certa { background: var(--good); border-color: var(--good); color: #ffffff; }
+.nav-num.nav-errada { background: var(--critical); border-color: var(--critical); color: #ffffff; }
+
+.legenda-item { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-secondary); }
+.legenda-quad { width: 13px; height: 13px; border-radius: 4px; display: inline-block; flex: none; border: 1px solid var(--border-strong); }
+.legenda-quad.nav-pendente { background: var(--surface-1); }
+.legenda-quad.nav-respondida { background: var(--warning); border-color: var(--warning); }
+.legenda-quad.nav-certa { background: var(--good); border-color: var(--good); }
+.legenda-quad.nav-errada { background: var(--critical); border-color: var(--critical); }
+
+.acoes-resumo-simulado { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.resultado-topo-compacto { padding: 20px 18px; margin-bottom: 14px; }
+
+/* Barra de progresso de respostas do simulado */
 .barra-progresso-wrap {
   height: 8px;
   border-radius: 999px;
   background: var(--gridline);
   overflow: hidden;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 .barra-progresso {
   height: 100%;
@@ -238,6 +288,48 @@ button { font-family: inherit; }
   border-radius: 999px;
   transition: width 0.2s ease;
 }
+
+/* Linha "Questão X de N" + ícone de legenda das cores */
+.questao-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+.info-legenda-wrap { position: relative; display: inline-flex; }
+.btn-info-legenda {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-1);
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.btn-info-legenda:hover { border-color: var(--accent); color: var(--accent); }
+.popover-legenda {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  position: absolute;
+  top: 26px;
+  left: 0;
+  z-index: 20;
+  background: var(--surface-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+}
+.popover-legenda.aberta { display: flex; }
 
 /* Card de questão */
 .card-questao {
@@ -442,6 +534,25 @@ table.tabela-simulados tr:last-child td { border-bottom: none; }
 
 .estado-vazio { color: var(--muted); font-size: 0.88rem; padding: 14px 0; }
 
+/* Página de Info */
+.info-secao { margin-bottom: 24px; }
+.info-secao:first-child .secao-titulo { margin-top: 0; }
+.info-texto {
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  margin: 0 0 10px;
+}
+.info-lista {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.info-lista li { margin-bottom: 6px; }
+.info-texto a, .info-lista a { color: var(--accent); }
+
 /* Resultado do simulado */
 .resultado-topo {
   text-align: center;
@@ -456,44 +567,6 @@ table.tabela-simulados tr:last-child td { border-bottom: none; }
 .resultado-fracao { color: var(--text-secondary); font-size: 0.95rem; margin-top: 2px; }
 .resultado-selo { margin-top: 12px; }
 
-.revisao-item {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  margin-bottom: 10px;
-  overflow: hidden;
-  background: var(--surface-1);
-}
-.revisao-cabecalho {
-  width: 100%;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px 14px;
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-.revisao-cabecalho .icone-resultado { flex: none; font-size: 1rem; margin-top: 1px; }
-.revisao-corpo {
-  padding: 0 14px 14px 38px;
-  font-size: 0.86rem;
-  color: var(--text-secondary);
-  display: none;
-}
-.revisao-corpo.aberto { display: block; }
-.revisao-corpo p { margin: 4px 0; }
-.revisao-alt { padding: 2px 0; }
-.revisao-alt.correta { color: var(--good); font-weight: 600; }
-.revisao-alt.escolhida-errada { color: var(--critical); font-weight: 600; text-decoration: line-through; }
-
-.cronometro {
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-}
 
 /* Modal de confirmação */
 .modal-backdrop {

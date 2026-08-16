@@ -15,22 +15,18 @@
         <span class="brand-title">Carteira Quiz</span>
         <span class="brand-sub">— Simulado CNH</span>
       </div>
-      <button id="btn-tema" class="btn-icon" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
-        <span id="icone-tema" aria-hidden="true">🌙</span>
-      </button>
+      <div class="topbar-acoes">
+        <button id="btn-info" class="btn-icon" type="button" aria-label="Sobre o projeto" title="Sobre o projeto">
+          <span aria-hidden="true">ℹ️</span>
+        </button>
+        <button id="btn-tema" class="btn-icon" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema">
+          <span id="icone-tema" aria-hidden="true">🌙</span>
+        </button>
+      </div>
     </div>
   </header>
 
   <main id="app" class="app"></main>
-
-  <footer class="rodape">
-    <p>
-      Questões: Banco Nacional de Questões (CNH do Brasil). Placas: Mosaico de Placas de Sinalização
-      (CNH do Brasil / SERPRO). Baseado no projeto
-      <a href="https://github.com/AmiltonCabral/brasil-cnh-quiz" target="_blank" rel="noopener noreferrer">brasil-cnh-quiz</a>
-      de Amilton Cabral.
-    </p>
-  </footer>
 
   <template id="tpl-modal">
     <div class="modal-backdrop">

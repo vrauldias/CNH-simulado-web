@@ -353,49 +353,76 @@
   }
 
   // ---------- modo simulado ----------
+  //
+  // Navegação livre entre as 30 questões (como no Moodle): dá para pular uma
+  // questão e voltar depois. sessao.respostas[i] guarda a alternativa
+  // escolhida para a questão i (ou null se ainda não respondida). O envio é
+  // uma ação explícita ("Enviar simulado"), separada de "avançar".
 
   function iniciarSimulado() {
     var questoesSimulado = amostraAleatoria(QUESTOES, TAMANHO_SIMULADO);
-    var primeira = questoesSimulado[0];
     sessao = {
       modo: "simulado",
       questoes: questoesSimulado,
-      indice: 0,
-      respostas: [],
+      alternativasPorQuestao: questoesSimulado.map(function (q) {
+        return embaralhar([q.correta].concat(q.incorretas));
+      }),
+      respostas: questoesSimulado.map(function () {
+        return null;
+      }),
+      indiceAtual: 0,
       inicio: Date.now(),
-      alternativasAtuais: embaralhar([primeira.correta].concat(primeira.incorretas)),
-      escolhida: null,
+      enviado: false,
+      resultado: null,
     };
     renderQuiz();
   }
 
   function selecionarAlternativaSimulado(texto) {
-    sessao.escolhida = texto;
+    sessao.respostas[sessao.indiceAtual] = texto;
     renderQuiz();
   }
 
-  function avancarSimulado() {
-    var questao = sessao.questoes[sessao.indice];
-    var acertou = sessao.escolhida === questao.correta;
-    sessao.respostas.push({ questao: questao, escolhida: sessao.escolhida, acertou: acertou });
-    registrarResposta(questao.id, acertou);
+  function irParaQuestao(idx) {
+    sessao.indiceAtual = idx;
+    renderQuiz();
+  }
 
-    if (sessao.indice === sessao.questoes.length - 1) {
-      finalizarSimulado();
-      return;
+  function irAnterior() {
+    if (sessao.indiceAtual > 0) {
+      sessao.indiceAtual -= 1;
+      renderQuiz();
     }
-    sessao.indice += 1;
-    var prox = sessao.questoes[sessao.indice];
-    sessao.alternativasAtuais = embaralhar([prox.correta].concat(prox.incorretas));
-    sessao.escolhida = null;
-    renderQuiz();
   }
 
-  function finalizarSimulado() {
-    var total = sessao.respostas.length;
-    var acertos = sessao.respostas.filter(function (r) {
-      return r.acertou;
+  function irProxima() {
+    if (sessao.indiceAtual < sessao.questoes.length - 1) {
+      sessao.indiceAtual += 1;
+      renderQuiz();
+    }
+  }
+
+  function confirmarEnvioSimulado() {
+    var naoRespondidas = sessao.respostas.filter(function (r) {
+      return r === null;
     }).length;
+    var msg =
+      naoRespondidas > 0
+        ? "Ainda há " + naoRespondidas + " questão(ões) sem resposta. Enviar o simulado assim mesmo?"
+        : "Enviar o simulado para correção? Não dá para alterar as respostas depois.";
+    confirmar(msg, enviarSimulado);
+  }
+
+  function enviarSimulado() {
+    var porQuestao = sessao.questoes.map(function (q, i) {
+      var escolhida = sessao.respostas[i];
+      var acertou = escolhida !== null && escolhida === q.correta;
+      if (escolhida !== null) registrarResposta(q.id, acertou);
+      return acertou;
+    });
+
+    var total = sessao.questoes.length;
+    var acertos = porQuestao.filter(Boolean).length;
     var duracaoSeg = Math.round((Date.now() - sessao.inicio) / 1000);
     var percentual = Math.round((acertos / total) * 1000) / 10;
     var aprovado = acertos >= NOTA_APROVACAO;
@@ -412,8 +439,101 @@
     simulados = simulados.slice(0, 20);
     salvarSimulados(simulados);
 
-    sessao.finalizado = { respostas: sessao.respostas, registro: registro };
-    renderResultadoSimulado();
+    sessao.enviado = true;
+    sessao.resultado = { porQuestao: porQuestao, registro: registro };
+    sessao.indiceAtual = 0;
+    renderQuiz();
+  }
+
+  // ---------- navegador de questões (grade estilo Moodle) ----------
+
+  function legendaItem(classe, texto) {
+    var item = criarEl("span", "legenda-item");
+    item.appendChild(criarEl("span", "legenda-quad " + classe));
+    item.appendChild(document.createTextNode(texto));
+    return item;
+  }
+
+  // Popover com a legenda de cores, aberto pelo ícone "ⓘ" ao lado de
+  // "Questão X de N". Só um pode ficar aberto por vez; fecha ao clicar fora.
+  var popoverLegendaAberto = null;
+
+  function fecharPopoverLegenda() {
+    if (popoverLegendaAberto) {
+      popoverLegendaAberto.classList.remove("aberta");
+      popoverLegendaAberto = null;
+    }
+  }
+
+  function criarBotaoInfoLegenda(enviado) {
+    var wrap = criarEl("span", "info-legenda-wrap");
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn-info-legenda";
+    btn.setAttribute("aria-label", "O que significam as cores da navegação");
+    btn.textContent = "ⓘ";
+
+    var pop = criarEl("div", "popover-legenda");
+    if (enviado) {
+      pop.appendChild(legendaItem("nav-certa", "Certa"));
+      pop.appendChild(legendaItem("nav-errada", "Errada ou em branco"));
+    } else {
+      pop.appendChild(legendaItem("nav-respondida", "Respondida"));
+      pop.appendChild(legendaItem("nav-pendente", "Não respondida"));
+    }
+
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (popoverLegendaAberto === pop) {
+        fecharPopoverLegenda();
+        return;
+      }
+      fecharPopoverLegenda();
+      pop.classList.add("aberta");
+      popoverLegendaAberto = pop;
+    });
+
+    wrap.appendChild(btn);
+    wrap.appendChild(pop);
+    return wrap;
+  }
+
+  function renderNavegadorSimulado() {
+    var wrap = document.createElement("div");
+    wrap.className = "navegador-simulado";
+
+    var cabecalho = criarEl("div", "navegador-cabecalho");
+    cabecalho.appendChild(criarEl("span", "navegador-titulo", "Navegação"));
+    if (!sessao.enviado) {
+      var btnEnviar = criarEl("button", "btn btn-primario btn-enviar-simulado", "Enviar simulado");
+      btnEnviar.type = "button";
+      btnEnviar.addEventListener("click", confirmarEnvioSimulado);
+      cabecalho.appendChild(btnEnviar);
+    }
+    wrap.appendChild(cabecalho);
+
+    var grid = document.createElement("div");
+    grid.className = "navegador-grid";
+    sessao.questoes.forEach(function (q, i) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "nav-num";
+      btn.textContent = String(i + 1);
+      if (i === sessao.indiceAtual) btn.classList.add("atual");
+      if (sessao.enviado) {
+        btn.classList.add(sessao.resultado.porQuestao[i] ? "nav-certa" : "nav-errada");
+      } else {
+        btn.classList.add(sessao.respostas[i] !== null ? "nav-respondida" : "nav-pendente");
+      }
+      btn.setAttribute("aria-label", "Questão " + (i + 1));
+      btn.addEventListener("click", function () {
+        irParaQuestao(i);
+      });
+      grid.appendChild(btn);
+    });
+    wrap.appendChild(grid);
+
+    return wrap;
   }
 
   // ---------- tela de questão (treino + simulado) ----------
@@ -442,34 +562,90 @@
 
   function renderQuiz() {
     app.innerHTML = "";
+    var ehSimulado = sessao.modo === "simulado";
 
     var header = criarEl("div", "tela-header");
-    header.appendChild(criarEl("h2", "tela-titulo", sessao.modo === "simulado" ? "📝 Simulado" : "▶️ Modo treino"));
-    var sair = criarEl("button", "link-voltar", sessao.modo === "simulado" ? "✕ Sair do simulado" : "✕ Encerrar treino");
-    sair.type = "button";
-    sair.addEventListener("click", function () {
-      confirmar(
-        sessao.modo === "simulado" ? "Sair agora descarta o simulado em andamento. Confirma?" : "Encerrar o treino e voltar ao menu?",
-        renderMenu
-      );
-    });
-    header.appendChild(sair);
+    header.appendChild(
+      criarEl("h2", "tela-titulo", ehSimulado ? "📝 Simulado" : "▶️ Modo treino")
+    );
+    if (ehSimulado && sessao.enviado) {
+      var voltarMenu = criarEl("button", "link-voltar", "← Menu");
+      voltarMenu.type = "button";
+      voltarMenu.addEventListener("click", renderMenu);
+      header.appendChild(voltarMenu);
+    } else {
+      var sair = criarEl("button", "link-voltar", ehSimulado ? "✕ Sair do simulado" : "✕ Encerrar treino");
+      sair.type = "button";
+      sair.addEventListener("click", function () {
+        confirmar(
+          ehSimulado ? "Sair agora descarta o simulado em andamento. Confirma?" : "Encerrar o treino e voltar ao menu?",
+          renderMenu
+        );
+      });
+      header.appendChild(sair);
+    }
     app.appendChild(header);
 
     var questaoAtual, indiceAtual, totalAtual;
 
-    if (sessao.modo === "simulado") {
-      indiceAtual = sessao.indice;
+    if (ehSimulado) {
+      indiceAtual = sessao.indiceAtual;
       totalAtual = sessao.questoes.length;
       questaoAtual = sessao.questoes[indiceAtual];
 
-      var barraWrap = criarEl("div", "barra-progresso-wrap");
-      var barra = criarEl("div", "barra-progresso");
-      barra.style.width = Math.round((indiceAtual / totalAtual) * 100) + "%";
-      barraWrap.appendChild(barra);
-      app.appendChild(barraWrap);
+      if (sessao.enviado) {
+        var reg = sessao.resultado.registro;
+        var resumo = document.createElement("div");
+        resumo.className = "resultado-topo resultado-topo-compacto";
+        resumo.appendChild(criarEl("div", "resultado-percentual", formatarPercentual(reg.percentual)));
+        resumo.appendChild(
+          criarEl(
+            "div",
+            "resultado-fracao",
+            reg.acertos + " de " + reg.total + " questões corretas · " + formatarDuracao(reg.duracaoSeg)
+          )
+        );
+        var seloWrap = criarEl("div", "resultado-selo");
+        seloWrap.appendChild(
+          criarEl(
+            "span",
+            "pill-status " + (reg.aprovado ? "pill-aprovado" : "pill-reprovado"),
+            reg.aprovado ? "✅ Aprovado" : "❌ Reprovado"
+          )
+        );
+        resumo.appendChild(seloWrap);
+        app.appendChild(resumo);
 
-      app.appendChild(criarEl("p", "meter-label", "Questão " + (indiceAtual + 1) + " de " + totalAtual));
+        var acoesResumo = criarEl("div", "acoes-resumo-simulado");
+        var btnRefazer = criarEl("button", "btn btn-primario", "🔁 Refazer simulado");
+        btnRefazer.type = "button";
+        btnRefazer.addEventListener("click", iniciarSimulado);
+        var btnMenu = criarEl("button", "btn btn-secundario", "Voltar ao menu");
+        btnMenu.type = "button";
+        btnMenu.addEventListener("click", renderMenu);
+        acoesResumo.appendChild(btnRefazer);
+        acoesResumo.appendChild(btnMenu);
+        app.appendChild(acoesResumo);
+      }
+
+      app.appendChild(renderNavegadorSimulado());
+
+      var respondidasCount = sessao.respostas.filter(function (r) {
+        return r !== null;
+      }).length;
+
+      if (!sessao.enviado) {
+        var barraWrap = criarEl("div", "barra-progresso-wrap");
+        var barra = criarEl("div", "barra-progresso");
+        barra.style.width = Math.round((respondidasCount / totalAtual) * 100) + "%";
+        barraWrap.appendChild(barra);
+        app.appendChild(barraWrap);
+      }
+
+      var linhaInfo = criarEl("div", "questao-info-row");
+      linhaInfo.appendChild(criarEl("span", null, "Questão " + (indiceAtual + 1) + " de " + totalAtual));
+      linhaInfo.appendChild(criarBotaoInfoLegenda(sessao.enviado));
+      app.appendChild(linhaInfo);
     } else {
       questaoAtual = sessao.questaoAtual;
       var stats = agregarStats();
@@ -485,7 +661,8 @@
 
     var lista = document.createElement("ul");
     lista.className = "alternativas";
-    var alternativas = sessao.alternativasAtuais;
+    var alternativas = ehSimulado ? sessao.alternativasPorQuestao[indiceAtual] : sessao.alternativasAtuais;
+    var escolhidaSimulado = ehSimulado ? sessao.respostas[indiceAtual] : null;
 
     alternativas.forEach(function (texto, idx) {
       var li = document.createElement("li");
@@ -495,34 +672,41 @@
       btn.appendChild(criarEl("span", "alt-letra", LETRAS[idx]));
       btn.appendChild(criarEl("span", null, texto));
 
-      if (sessao.modo === "simulado") {
-        if (sessao.escolhida === texto) btn.classList.add("selecionada");
-        btn.addEventListener("click", function () {
-          selecionarAlternativaSimulado(texto);
-        });
-      } else {
-        if (sessao.respondida) {
+      if (ehSimulado) {
+        if (sessao.enviado) {
           btn.disabled = true;
           if (texto === questaoAtual.correta) btn.classList.add("correta");
-          else if (texto === sessao.escolhida) btn.classList.add("incorreta");
+          else if (texto === escolhidaSimulado) btn.classList.add("incorreta");
           else btn.classList.add("neutra-desabilitada");
         } else {
+          if (escolhidaSimulado === texto) btn.classList.add("selecionada");
           btn.addEventListener("click", function () {
-            responderTreino(texto);
+            selecionarAlternativaSimulado(texto);
           });
         }
+      } else if (sessao.respondida) {
+        btn.disabled = true;
+        if (texto === questaoAtual.correta) btn.classList.add("correta");
+        else if (texto === sessao.escolhida) btn.classList.add("incorreta");
+        else btn.classList.add("neutra-desabilitada");
+      } else {
+        btn.addEventListener("click", function () {
+          responderTreino(texto);
+        });
       }
       li.appendChild(btn);
       lista.appendChild(li);
     });
     card.appendChild(lista);
 
-    if (sessao.modo === "treino" && sessao.respondida) {
-      var acertou = sessao.escolhida === questaoAtual.correta;
+    if (!ehSimulado && sessao.respondida) {
+      var acertouTreino = sessao.escolhida === questaoAtual.correta;
       var painel = document.createElement("div");
-      painel.className = "painel-resultado " + (acertou ? "acerto" : "erro");
-      painel.appendChild(criarEl("p", "painel-resultado-titulo", acertou ? "✅ Resposta correta!" : "❌ Resposta incorreta"));
-      if (!acertou) {
+      painel.className = "painel-resultado " + (acertouTreino ? "acerto" : "erro");
+      painel.appendChild(
+        criarEl("p", "painel-resultado-titulo", acertouTreino ? "✅ Resposta correta!" : "❌ Resposta incorreta")
+      );
+      if (!acertouTreino) {
         painel.appendChild(criarEl("p", "painel-resultado-comentario", "Alternativa correta: " + questaoAtual.correta));
       }
       painel.appendChild(criarEl("p", "painel-resultado-comentario", questaoAtual.comentario));
@@ -540,85 +724,42 @@
       card.appendChild(acoesTreino);
     }
 
-    if (sessao.modo === "simulado") {
+    if (ehSimulado && sessao.enviado) {
+      var acertouSim = sessao.resultado.porQuestao[indiceAtual];
+      var painelSim = document.createElement("div");
+      painelSim.className = "painel-resultado " + (acertouSim ? "acerto" : "erro");
+      painelSim.appendChild(
+        criarEl(
+          "p",
+          "painel-resultado-titulo",
+          acertouSim ? "✅ Você acertou" : escolhidaSimulado === null ? "❌ Questão em branco" : "❌ Você errou"
+        )
+      );
+      if (!acertouSim) {
+        painelSim.appendChild(criarEl("p", "painel-resultado-comentario", "Alternativa correta: " + questaoAtual.correta));
+      }
+      painelSim.appendChild(criarEl("p", "painel-resultado-comentario", questaoAtual.comentario));
+      card.appendChild(painelSim);
+    }
+
+    if (ehSimulado) {
       var acoesSim = criarEl("div", "acoes-questao");
-      acoesSim.appendChild(document.createElement("span"));
-      var ultima = indiceAtual === totalAtual - 1;
-      var btnAvancar = criarEl("button", "btn btn-primario", ultima ? "Finalizar simulado" : "Próxima questão →");
-      btnAvancar.type = "button";
-      btnAvancar.disabled = !sessao.escolhida;
-      btnAvancar.addEventListener("click", avancarSimulado);
-      acoesSim.appendChild(btnAvancar);
+      var btnAnterior = criarEl("button", "btn btn-secundario", "← Anterior");
+      btnAnterior.type = "button";
+      btnAnterior.disabled = indiceAtual === 0;
+      btnAnterior.addEventListener("click", irAnterior);
+      acoesSim.appendChild(btnAnterior);
+
+      var btnProxima = criarEl("button", "btn btn-primario", "Próxima →");
+      btnProxima.type = "button";
+      btnProxima.disabled = indiceAtual === totalAtual - 1;
+      btnProxima.addEventListener("click", irProxima);
+      acoesSim.appendChild(btnProxima);
+
       card.appendChild(acoesSim);
     }
 
     app.appendChild(card);
-  }
-
-  // ---------- resultado do simulado ----------
-
-  function renderResultadoSimulado() {
-    app.innerHTML = "";
-    var dados = sessao.finalizado;
-    var reg = dados.registro;
-
-    var header = criarEl("div", "tela-header");
-    header.appendChild(criarEl("h2", "tela-titulo", "Resultado do simulado"));
-    app.appendChild(header);
-
-    var topo = document.createElement("div");
-    topo.className = "resultado-topo";
-    topo.appendChild(criarEl("div", "resultado-percentual", formatarPercentual(reg.percentual)));
-    topo.appendChild(
-      criarEl("div", "resultado-fracao", reg.acertos + " de " + reg.total + " questões corretas · " + formatarDuracao(reg.duracaoSeg))
-    );
-    var seloWrap = criarEl("div", "resultado-selo");
-    seloWrap.appendChild(criarEl("span", "pill-status " + (reg.aprovado ? "pill-aprovado" : "pill-reprovado"), reg.aprovado ? "✅ Aprovado" : "❌ Reprovado"));
-    topo.appendChild(seloWrap);
-    app.appendChild(topo);
-
-    var acoes = criarEl("div", "acoes-questao");
-    acoes.style.justifyContent = "flex-start";
-    acoes.style.gap = "10px";
-    var btnRefazer = criarEl("button", "btn btn-primario", "🔁 Refazer simulado");
-    btnRefazer.type = "button";
-    btnRefazer.addEventListener("click", iniciarSimulado);
-    var btnMenu = criarEl("button", "btn btn-secundario", "Voltar ao menu");
-    btnMenu.type = "button";
-    btnMenu.addEventListener("click", renderMenu);
-    acoes.appendChild(btnRefazer);
-    acoes.appendChild(btnMenu);
-    app.appendChild(acoes);
-
-    app.appendChild(criarEl("h3", "secao-titulo", "Revisão das questões"));
-
-    dados.respostas.forEach(function (r, idx) {
-      var item = document.createElement("div");
-      item.className = "revisao-item";
-
-      var cab = document.createElement("button");
-      cab.type = "button";
-      cab.className = "revisao-cabecalho";
-      cab.appendChild(criarEl("span", "icone-resultado", r.acertou ? "✅" : "❌"));
-      cab.appendChild(criarEl("span", null, idx + 1 + ". " + r.questao.pergunta));
-
-      var corpo = document.createElement("div");
-      corpo.className = "revisao-corpo";
-      renderPlacas(corpo, r.questao.codigo_placa);
-      corpo.appendChild(criarEl("p", "revisao-alt correta", "✓ " + r.questao.correta));
-      if (!r.acertou) {
-        corpo.appendChild(criarEl("p", "revisao-alt escolhida-errada", "✗ " + r.escolhida));
-      }
-      corpo.appendChild(criarEl("p", null, r.questao.comentario));
-
-      cab.addEventListener("click", function () {
-        corpo.classList.toggle("aberto");
-      });
-
-      item.appendChild(cab);
-      item.appendChild(corpo);
-      app.appendChild(item);
-    });
   }
 
   // ---------- status ----------
@@ -707,10 +848,120 @@
     }
   }
 
+  // ---------- info (sobre o projeto) ----------
+
+  function criarSecaoInfo(titulo, elementos) {
+    var secao = criarEl("div", "info-secao");
+    secao.appendChild(criarEl("h3", "secao-titulo", titulo));
+    elementos.forEach(function (el) {
+      secao.appendChild(el);
+    });
+    return secao;
+  }
+
+  function criarLink(texto, url) {
+    var a = document.createElement("a");
+    a.href = url;
+    a.textContent = texto;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    return a;
+  }
+
+  function criarParagrafo(partes) {
+    var p = criarEl("p", "info-texto");
+    partes.forEach(function (parte) {
+      if (typeof parte === "string") p.appendChild(document.createTextNode(parte));
+      else p.appendChild(parte);
+    });
+    return p;
+  }
+
+  function renderInfo() {
+    sessao = null;
+    app.innerHTML = "";
+
+    var header = criarEl("div", "tela-header");
+    header.appendChild(criarEl("h2", "tela-titulo", "ℹ️ Sobre o projeto"));
+    var voltar = criarEl("button", "link-voltar", "← Menu");
+    voltar.type = "button";
+    voltar.addEventListener("click", renderMenu);
+    header.appendChild(voltar);
+    app.appendChild(header);
+
+    app.appendChild(
+      criarSecaoInfo("Como o material foi criado", [
+        criarParagrafo([
+          "As ",
+          String(QUESTOES.length),
+          " questões vêm do PDF oficial “Banco Nacional de Questões” (CNH do Brasil). Um script " +
+            "processou automaticamente cada questão do documento — enunciado, dificuldade, alternativas e " +
+            "comentário — e gerou o banco de dados usado pelo treino e pelo simulado.",
+        ]),
+        criarParagrafo([
+          "As imagens das placas foram extraídas do PDF oficial “Mosaico de Placas de Sinalização” " +
+            "(CNH do Brasil / SERPRO), material complementar do curso de primeira habilitação: cada código " +
+            "de placa (ex.: A-33a) foi localizado e recortado da posição correspondente no mosaico.",
+        ]),
+        criarParagrafo([
+          "Todo o progresso de treino e o histórico de simulados ficam salvos apenas neste navegador " +
+            "(localStorage) — nada é enviado a servidores.",
+        ]),
+      ])
+    );
+
+    app.appendChild(
+      criarSecaoInfo("Créditos", [
+        criarParagrafo([
+          "Esta versão web é uma adaptação (HTML/CSS/JS) do app de terminal ",
+          criarLink("brasil-cnh-quiz", "https://github.com/AmiltonCabral/brasil-cnh-quiz"),
+          ", criado por Amilton Cabral. A ideia original, a estrutura do banco de questões e a lógica de " +
+            "treino ponderado por acerto/erro são dele.",
+        ]),
+        criarParagrafo([
+          "Por ser derivado de um projeto licenciado em GPLv3, este projeto mantém a mesma licença.",
+        ]),
+      ])
+    );
+
+    app.appendChild(
+      criarSecaoInfo("Modos disponíveis", [
+        (function () {
+          var ul = document.createElement("ul");
+          ul.className = "info-lista";
+          var itens = [
+            "Treino: sorteio ponderado, priorizando questões erradas ou ainda não vistas, com feedback imediato.",
+            "Simulado: " +
+              TAMANHO_SIMULADO +
+              " questões, navegação livre entre elas (dá pra pular e voltar), aprovação a partir de " +
+              NOTA_APROVACAO +
+              " acertos (70%), com correção e revisão só depois de enviado.",
+          ];
+          itens.forEach(function (texto) {
+            ul.appendChild(criarEl("li", null, texto));
+          });
+          return ul;
+        })(),
+      ])
+    );
+  }
+
+  function irParaInfo() {
+    if (sessao && sessao.modo === "simulado" && !sessao.enviado) {
+      confirmar("Sair agora descarta o simulado em andamento. Confirma?", renderInfo);
+    } else {
+      renderInfo();
+    }
+  }
+
   // ---------- boot ----------
+
+  document.addEventListener("click", fecharPopoverLegenda);
 
   document.addEventListener("DOMContentLoaded", function () {
     inicializarTema();
+    var btnInfo = document.getElementById("btn-info");
+    if (btnInfo) btnInfo.addEventListener("click", irParaInfo);
     renderMenu();
   });
 })();
