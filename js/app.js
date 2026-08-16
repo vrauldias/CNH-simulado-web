@@ -677,8 +677,6 @@
         app.appendChild(acoesResumo);
       }
 
-      app.appendChild(renderNavegadorSimulado());
-
       var respondidasCount = sessao.respostas.filter(function (r) {
         return r !== null;
       }).length;
@@ -809,6 +807,10 @@
     }
 
     app.appendChild(card);
+
+    if (ehSimulado) {
+      app.appendChild(renderNavegadorSimulado());
+    }
   }
 
   // ---------- status ----------
