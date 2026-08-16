@@ -2,7 +2,7 @@
 
 ## Acesse direto pelo navegador (sem baixar nada)
 
-**🔗 [COLOQUE AQUI O LINK DO GITHUB PAGES]**
+**🔗 https://vrauldias.github.io/CNH-simulado-web/**
 
 Abra o link acima em qualquer navegador (computador ou celular) e comece a
 estudar na hora — nada para instalar ou baixar.
